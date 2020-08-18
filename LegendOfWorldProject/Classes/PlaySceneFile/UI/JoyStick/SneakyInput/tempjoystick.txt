@@ -1,0 +1,538 @@
+
+
+//////////////////////////////////HSJoystick.h (I ported Obj-c code : http://www.cocos2d-iphone.org/forum/topic/1418 )
+
+
+#pragma once
+#include "cocos2d.h"
+
+using namespace cocos2d;
+
+class HSJoystick : public CCLayer
+{
+
+public:
+
+    virtual bool init();  
+    CCPoint getVelocity(){return velocity;}
+    LAYER_NODE_FUNC(HSJoystick);
+
+private:
+
+    CCPoint kCenter;
+    CCSprite *thumb;
+    bool isPressed;
+
+    CCPoint velocity;
+
+    void updateVelocity(CCPoint point);
+    void resetJoystick();
+    bool handleLastTouch();
+    void ccTouchesBegan(CCSet *pTouches, CCEvent *pEvent);
+    void ccTouchesMoved(CCSet *pTouches, CCEvent *pEvent);
+    void ccTouchCancelled(CCTouch *pTouch, CCEvent *pEvent);
+    void ccTouchesEnded(CCSet *pTouches, CCEvent *pEvent);
+
+};
+
+
+
+
+
+
+
+
+
+////////////////////////////////// HSJoystick.cpp
+
+
+#include "HSJoystick.h"
+
+#define JOYSTICK_OFFSET_X 5.0f
+#define JOYSTICK_OFFSET_Y 5.0f
+
+#define JOYSTICK_RADIUS 64.0f
+
+#define THUMB_RADIUS 26.0f
+
+
+
+static CCPoint convertCoordinate(CCPoint point){
+    return CCDirector::sharedDirector()->convertToGL(point);
+}
+
+static bool isPointInCircle(CCPoint point, CCPoint center, float radius){
+    float dx = (point.x - center.x);
+    float dy = (point.y - center.y);
+    return (radius >= sqrt((dx*dx)+(dy*dy)));
+}
+
+bool HSJoystick::init()
+{
+    bool bRet = false;
+    do 
+    {
+
+
+
+
+        kCenter=CCPoint(JOYSTICK_RADIUS + JOYSTICK_OFFSET_X,
+            JOYSTICK_RADIUS + JOYSTICK_OFFSET_Y);
+        //////////////////////////////////////////////////////////////////////////
+        // super init first
+        //////////////////////////////////////////////////////////////////////////
+
+        CC_BREAK_IF(!CCLayer::init());
+
+        //////////////////////////////////////////////////////////////////////////
+        // add your codes below...
+        //////////////////////////////////////////////////////////////////////////
+
+        this->setIsTouchEnabled(true);
+        velocity = CCPointZero;
+
+        CCSprite *bg = CCSprite::spriteWithFile("joystick_background.png");
+        bg->setPosition(kCenter);
+        this->addChild(bg,0);
+
+        thumb = CCSprite::spriteWithFile("joystick_thumb.png");
+        thumb->setPosition(kCenter);
+        this->addChild(thumb,1);
+
+        bRet=true;
+
+    }while(0);
+
+    return bRet;
+}
+
+
+void HSJoystick::updateVelocity(CCPoint point)
+{
+    // calculate Angle and length
+    float dx = point.x - kCenter.x;
+    float dy = point.y - kCenter.y;
+
+    float distance = sqrt(dx*dx + dy*dy);
+    float angle = atan2(dy,dx); // in radians
+
+    if(distance > JOYSTICK_RADIUS){
+        dx = cos(angle) * JOYSTICK_RADIUS;
+        dy = sin(angle) * JOYSTICK_RADIUS;
+    }
+
+    velocity = CCPointMake(dx/JOYSTICK_RADIUS, dy/JOYSTICK_RADIUS);
+
+    if(distance>THUMB_RADIUS)
+    {
+        point.x = kCenter.x + cos(angle) * THUMB_RADIUS;
+        point.y = kCenter.y + sin(angle) * THUMB_RADIUS;
+    }
+
+    thumb->setPosition(point);
+}
+
+void HSJoystick::resetJoystick()
+{
+    this->updateVelocity(kCenter);
+}
+
+bool HSJoystick::handleLastTouch()
+{
+    bool wasPressed = isPressed;
+    if(wasPressed){
+        this->resetJoystick();
+        isPressed = false;
+    }
+    return (wasPressed ? true : false);
+}
+
+
+void HSJoystick::ccTouchesBegan( CCSet *pTouches, CCEvent *pEvent )
+{
+    CCTouch *touch = (CCTouch*)pTouches->anyObject();
+    CCPoint point = touch->locationInView(touch->view());
+    point = convertCoordinate(point);
+
+    if(isPointInCircle(point,kCenter,JOYSTICK_RADIUS)){
+        isPressed = true;
+        this->updateVelocity(point);
+    }
+}
+
+
+
+
+void HSJoystick::ccTouchesMoved( CCSet *pTouches, CCEvent *pEvent )
+{
+    if(isPressed){
+        CCTouch *touch = (CCTouch*)pTouches->anyObject();
+        CCPoint point = touch->locationInView(touch->view());
+        point = convertCoordinate(point);
+        this->updateVelocity(point);
+    }
+}
+
+void HSJoystick::ccTouchCancelled( CCTouch *pTouch, CCEvent *pEvent )
+{
+    this->handleLastTouch();
+}
+
+void HSJoystick::ccTouchesEnded( CCSet *pTouches, CCEvent *pEvent )
+{
+    this->handleLastTouch();
+}
+
+
+
+
+
+
+
+
+////////////////////////////////// HSPlayer.h  // Ball which one is controlled by Joystick
+
+#pragma once 
+
+
+#include "cocos2d.h"
+#include "Box2D/Box2D.h"
+#include "HSJoystick.h"
+
+#ifndef PTM_RATIO
+#define PTM_RATIO 32
+#endif
+
+using namespace cocos2d;
+
+
+class HSPlayer : public CCNode
+{
+
+public:
+    HSPlayer();
+    ~HSPlayer();
+
+    static HSPlayer * node(void);
+
+    virtual bool initWithWorld(b2World *world); 
+    void setJoystick(HSJoystick *joystick);
+
+private:
+
+    HSJoystick *m_pJoystick;
+    b2World *m_pWorld; // box2d world member Pointer
+    b2Body *body;
+    b2CircleShape m_ShapeDef;
+    b2FixtureDef m_fixtureDef;
+
+    CCSpeed *action;
+    virtual void update(ccTime dt);
+
+
+    void createBallandAnimation();
+
+    cocos2d::CCSprite *pPlayer;
+    cocos2d::CCSprite *pShadow;
+    cocos2d::CCAnimate *stoneMove;
+
+};
+@
+
+
+
+
+
+
+
+HSPlayer.cpp
+
+#include "HSPlayer.h"
+#include "HSGame.h"
+
+
+HSPlayer::HSPlayer()
+{
+
+}
+
+HSPlayer::~HSPlayer()
+{   
+
+}
+
+
+
+
+bool HSPlayer::initWithWorld(b2World *world)
+{
+    bool bRet = false;
+    do 
+    {
+
+        // initialize
+
+        pPlayer = new CCSprite();
+        CC_BREAK_IF(! pPlayer);
+
+        CCSize size = CCDirector::sharedDirector()->getWinSize();
+
+
+        // Define Body
+        b2BodyDef bodyDef;
+        bodyDef.type = b2_dynamicBody;
+        bodyDef.position.Set(size.width/2/PTM_RATIO, size.height/2/PTM_RATIO);
+        bodyDef.userData = pPlayer;
+        body = world->CreateBody(&bodyDef);
+
+
+        // Define another box shape for our dynamic body.
+
+        m_ShapeDef.m_p.SetZero();
+        m_ShapeDef.m_radius = 0.7f;
+
+
+
+        // Define the dynamic body fixture.
+
+
+        m_fixtureDef.shape = &m_ShapeDef;
+        m_fixtureDef.density = 1.0f;
+        m_fixtureDef.friction = 1.0f;
+        m_fixtureDef.restitution = 0.3f;
+
+
+        body->SetLinearDamping(0.8f);
+        body->SetAngularDamping(1.0f);
+
+
+        body->CreateFixture(&m_fixtureDef);
+        body->SetBullet(true);
+
+
+
+        createBallandAnimation();
+
+        action = CCSpeed::actionWithAction(CCRepeatForever::actionWithAction(stoneMove),0.0f);
+        pPlayer->runAction(action);
+        this->addChild(pPlayer);
+
+        scheduleUpdate();
+
+        bRet=true;
+
+    }while(0);
+
+    return bRet;
+}
+
+
+void HSPlayer::createBallandAnimation()
+{
+    CCSize s = CCDirector::sharedDirector()->getWinSize();
+    CCTexture2D *texture = CCTextureCache::sharedTextureCache()->addImage("stone_roll.png");
+    CCMutableArray *aniFrames =new CCMutableArray(10);
+
+    CCSpriteFrameCache::sharedSpriteFrameCache()->addSpriteFramesWithFile("ball.plist");
+    CCSize frameSize = CCSizeMake(50,50);
+
+    // create Frame
+    for(int i = 0; i < 10 ; i ++)
+    {
+        char str[25];
+        sprintf(str,"ballh_%02d.png",i);
+        CCSpriteFrame *frame = CCSpriteFrameCache::sharedSpriteFrameCache()->spriteFrameByName(str);
+        aniFrames->addObject(frame);
+    }
+
+
+
+    CCAnimation *animation = CCAnimation::animationWithFrames(aniFrames, 0.2f);
+    CCAnimate *animate = CCAnimate::actionWithAnimation(animation, false);
+    stoneMove = animate;
+
+    aniFrames->release();
+}
+
+
+
+HSPlayer * HSPlayer::node( void )
+{
+    HSPlayer * pRet = new HSPlayer();
+    pRet->autorelease();
+    return pRet;
+}
+
+void HSPlayer::update( ccTime dt )
+{
+    float vx = m_pJoystick->getVelocity().x;
+    float vy = m_pJoystick->getVelocity().y;
+
+    // set ball velocity by Joystick
+    body->SetLinearVelocity(b2Vec2(vx,vy)+body->GetLinearVelocity());
+
+    // rotation ball by direction
+    b2Vec2 vec = body->GetLinearVelocity();
+    pPlayer->setRotation(-1*CC_RADIANS_TO_DEGREES(ccpToAngle(CCPointMake(vec.x, vec.y))));
+
+    // animation speed by speed
+    float vel;
+    vel = body->GetLinearVelocity().Normalize();
+    action->setSpeed(vel);
+}
+
+void HSPlayer::setJoystick( HSJoystick *joystick )
+{
+    m_pJoystick = joystick;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+//////////////////////////////////HSGame.h
+
+
+...........
+private:
+    HSJoystick *joystick;
+    b2World *world;
+    HSPlayer *m_pPlayer;
+
+    GLESDebugDraw *m_debugDraw;
+    bool isControllPressed;
+
+
+    void update(ccTime dt);
+......
+
+
+//////////////////////////////////HSGame.cpp
+....
+init()
+{
+.....
+
+        joystick =  HSJoystick::node();
+        this->addChild(joystick,2);
+
+        b2Vec2 gravity;
+        gravity.Set(0.0f, 0.0f);
+
+    // Do we want to let bodies sleep?
+    bool doSleep = true;
+
+    // Construct a world object, which will hold and simulate the rigid bodies.
+    world = new b2World(gravity, doSleep);
+    world->SetContinuousPhysics(true);
+
+
+    m_debugDraw = new GLESDebugDraw( PTM_RATIO );
+    world->SetDebugDraw(m_debugDraw);
+
+    uint32 flags = 0;
+    flags += b2DebugDraw::e_shapeBit;
+    flags += b2DebugDraw::e_jointBit;
+    flags += b2DebugDraw::e_aabbBit;
+    flags += b2DebugDraw::e_pairBit;
+    flags += b2DebugDraw::e_centerOfMassBit;
+    m_debugDraw->SetFlags(flags);       
+
+
+    //m_debugDraw->DrawCircle(b2Vec2(5.0f,5.0f),100.0f,b2Color(200.0f,100.0f,100.0f));
+
+    // Define the ground body.
+    b2BodyDef groundBodyDef;
+    groundBodyDef.position.Set(0, 0); // bottom-left corner
+
+    // Call the body factory which allocates memory for the ground body
+    // from a pool and creates the ground box shape (also from a pool).
+    // The body is also added to the world.
+    b2Body* groundBody = world->CreateBody(&groundBodyDef);
+
+    // Define the ground box shape.
+    b2PolygonShape groundBox;       
+
+    // bottom
+    groundBox.SetAsEdge(b2Vec2(0,0), b2Vec2(size.width/PTM_RATIO,0));
+    groundBody->CreateFixture(&groundBox, 0);
+
+    // top
+    groundBox.SetAsEdge(b2Vec2(0,size.height/PTM_RATIO), b2Vec2(size.width/PTM_RATIO,size.height/PTM_RATIO));
+    groundBody->CreateFixture(&groundBox, 0);
+
+    // left
+    groundBox.SetAsEdge(b2Vec2(0,size.height/PTM_RATIO), b2Vec2(0,0));
+    groundBody->CreateFixture(&groundBox, 0);
+
+    // right
+    groundBox.SetAsEdge(b2Vec2(size.width/PTM_RATIO,size.height/PTM_RATIO), b2Vec2(size.width/PTM_RATIO,0));
+    groundBody->CreateFixture(&groundBox, 0);
+
+
+
+    m_pPlayer = HSPlayer::node();
+    m_pPlayer->initWithWorld(world);
+    m_pPlayer->setJoystick(joystick);
+
+    this->addChild(m_pPlayer);
+    scheduleUpdate();
+    bRet = true;
+
+......
+}
+
+
+
+
+void HSGame::update(ccTime dt)
+{
+    //It is recommended that a fixed time step is used with Box2D for stability
+    //of the simulation, however, we are using a variable time step here.
+    //You need to make an informed choice, the following URL is useful
+    //http://gafferongames.com/game-physics/fix-your-timestep/
+
+    int velocityIterations = 8;
+    int positionIterations = 1;
+
+    // Instruct the world to perform a single step of simulation. It is
+    // generally best to keep the time step and iterations fixed.
+    world->Step(dt, velocityIterations, positionIterations);
+
+    //const float scale = .0f;
+
+
+    //Iterate over the bodies in the physics world
+    for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
+    {
+
+
+        if (b->GetUserData() != NULL) {
+            //Synchronize the AtlasSprites position and rotation with the corresponding body
+            CCSprite* myActor = (CCSprite*)b->GetUserData();
+            myActor->setPosition( CCPointMake( b->GetPosition(). x * PTM_RATIO, b->GetPosition().y * PTM_RATIO));
+        }   
+    }
+}
+
+void HSGame::draw()
+{
+
+    glDisable(GL_TEXTURE_2D);
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+    world->DrawDebugData();
+
+    // restore default GL states
+    glEnable(GL_TEXTURE_2D);
+    glEnableClientState(GL_COLOR_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);    
+}

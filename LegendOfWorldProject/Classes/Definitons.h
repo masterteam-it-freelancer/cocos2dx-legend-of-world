@@ -1,0 +1,49 @@
+//Definition file
+#pragma once
+
+#define FONT_SIZE_DEFAULT 20
+#define SSPLASH_LOGO  "/logo.png"
+#define SSPLASH_TRANSITION_TIME 1
+#define SMAINMENU_TRANSITION_TIME 1
+
+
+enum ETags {
+	TAG_CHAMPION,
+	TAG_GROUND,
+	TAG_WALL,
+};
+enum SCENEID{
+	SABOUT,
+	SEND_GAME,
+	SMAIN_MENU,
+	SMARKETPLACE,
+	SMATCH_MAKING,
+	SPLAYER_INFO,
+	SPLAYER_INVENTORY,
+	SPLAY_GAME,
+	SSET_INFO,
+	SSETTING,
+	SSPLASH,
+};
+
+/*
+Champion Definitions
+
+*/
+#define LEVEL_START 1
+#define LEVEL_MAX 25
+#define HP_MAX 50000
+#define MP_MAX 50000
+#define ARMOR_MAX 500
+#define MAGICAL_RES_MAX 500
+#define PHYSIC_DAME_MAX 1000
+#define MAGICAL_DAME_MAX 1000
+#define CRITICAL_DAME_START 0
+#define CRITICAL_DAME_MAX 1000
+#define ATTACK_SPEED_MAX 2.5
+
+
+
+
+
+//***********************************//
